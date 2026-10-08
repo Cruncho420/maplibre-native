@@ -75,6 +75,22 @@ void FillBucket::addFeature(const GeometryTileFeature& feature,
 #endif // MLN_TRIANGULATE_FILL_OUTLINES
 
 void FillBucket::upload([[maybe_unused]] gfx::UploadPass& uploadPass) {
+#if MLN_RENDER_BACKEND_OPENGL || MLN_RENDER_BACKEND_METAL
+    // Layout is final: each vector frees its CPU copy once a drawable has put it in a GPU buffer.
+    // OpenGL and Metal reuse the buffer stored on the vector when drawables are rebuilt from this bucket
+    // (gl/mtl UploadPass::getBuffer, DrawableGL/mtl::Drawable::upload). Vulkan and WebGPU can still read the
+    // raw data after the first upload, so they keep it.
+    sharedVertices->release();
+    sharedTriangles->release();
+#if MLN_TRIANGULATE_FILL_OUTLINES
+    sharedLineVertices->release();
+    sharedLineIndexes->release();
+#endif
+    sharedBasicLineIndexes->release();
+    for (auto& pair : paintPropertyBinders) {
+        pair.second.release();
+    }
+#endif
     uploaded = true;
 }
 
