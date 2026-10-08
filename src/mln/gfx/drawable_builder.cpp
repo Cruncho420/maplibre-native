@@ -211,7 +211,7 @@ void DrawableBuilder::setSegments(const gfx::DrawMode mode,
         const auto vertexCount = curVertexCount();
         assert(!vertexCount || seg.vertexOffset + seg.vertexLength <= curVertexCount());
         assert(seg.indexOffset + seg.indexLength <= impl->sharedIndexes->elements());
-        if (vertexCount) {
+        if (vertexCount && !impl->sharedIndexes->vector().empty()) { // empty once the GPU holds the only copy
             for (decltype(seg.indexLength) j = 0; j < seg.indexLength; ++j) {
                 assert(impl->sharedIndexes->vector()[seg.indexOffset + j] < vertexCount);
             }
