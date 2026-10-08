@@ -1,4 +1,5 @@
 #include <sstream>
+#include <list>
 #include <map>
 
 #include <mln/platform/settings.hpp>
@@ -34,9 +35,10 @@ namespace {
 constexpr int pmtilesHeaderOffset = 0;
 constexpr int pmtilesHeaderLength = 127;
 
-// To avoid allocating lots of memory with PMTiles directory caching,
-// set a limit so it doesn't grow unlimited
-constexpr int MAX_DIRECTORY_CACHE_ENTRIES = 100;
+// To avoid allocating lots of memory with PMTiles directory caching, bound the parsed directories of all
+// archives together by size (a leaf directory can hold tens of thousands of entries, so a count is no bound).
+// The most recently used directory is always kept, so a lookup never misses the directory it just stored.
+constexpr std::size_t MAX_DIRECTORY_CACHE_BYTES = 8 * 1024 * 1024;
 
 bool acceptsURL(const std::string& url) {
     return url.starts_with(mln::util::PMTILES_PROTOCOL);
@@ -228,7 +230,17 @@ private:
     std::map<std::string, pmtiles::headerv3> header_cache;
     std::map<std::string, std::string> metadata_cache;
     std::map<std::string, std::map<std::string, std::vector<pmtiles::entryv3>>> directory_cache;
-    std::map<std::string, std::vector<std::string>> directory_cache_control;
+    std::list<std::pair<std::string, std::string>> directory_cache_lru; // (url, key), least recently used first
+    std::size_t directory_cache_bytes = 0;
+
+    void touchDirectory(const std::string& url, const std::string& key) {
+        for (auto it = directory_cache_lru.begin(); it != directory_cache_lru.end(); ++it) {
+            if (it->first == url && it->second == key) {
+                directory_cache_lru.splice(directory_cache_lru.end(), directory_cache_lru, it);
+                return;
+            }
+        }
+    }
     std::map<AsyncRequest*, std::unique_ptr<AsyncRequest>> tasks;
 
     std::shared_ptr<FileSource> getFileSource() {
@@ -474,19 +486,27 @@ private:
                         uint64_t directoryOffset,
                         uint64_t directoryLength,
                         const std::string& directoryData) {
-        if (!directory_cache.contains(url)) {
-            directory_cache.emplace(url, std::map<std::string, std::vector<pmtiles::entryv3>>());
-            directory_cache_control.emplace(url, std::vector<std::string>());
-        }
-
         std::string directory_cache_key = url + "|" + std::to_string(directoryOffset) + "|" +
                                           std::to_string(directoryLength);
-        directory_cache.at(url).emplace(directory_cache_key, pmtiles::deserialize_directory(directoryData));
-        directory_cache_control.at(url).emplace_back(directory_cache_key);
+        auto& directories = directory_cache[url];
 
-        if (directory_cache_control.at(url).size() > MAX_DIRECTORY_CACHE_ENTRIES) {
-            directory_cache.at(url).erase(directory_cache_control.at(url).front());
-            directory_cache_control.at(url).erase(directory_cache_control.at(url).begin());
+        // Concurrent misses for one directory each fetch and store it: keep the resident copy, one LRU entry.
+        if (directories.contains(directory_cache_key)) {
+            touchDirectory(url, directory_cache_key);
+            return;
+        }
+
+        auto& stored = directories.emplace(directory_cache_key, pmtiles::deserialize_directory(directoryData))
+                           .first->second;
+        directory_cache_bytes += stored.size() * sizeof(pmtiles::entryv3);
+        directory_cache_lru.emplace_back(url, directory_cache_key);
+
+        while (directory_cache_bytes > MAX_DIRECTORY_CACHE_BYTES && directory_cache_lru.size() > 1) {
+            const auto& [evictURL, evictKey] = directory_cache_lru.front();
+            auto& evictDirectories = directory_cache.at(evictURL);
+            directory_cache_bytes -= evictDirectories.at(evictKey).size() * sizeof(pmtiles::entryv3);
+            evictDirectories.erase(evictKey);
+            directory_cache_lru.pop_front();
         }
     }
 
@@ -499,17 +519,7 @@ private:
                                           std::to_string(directoryLength);
 
         if (directory_cache.contains(url) && directory_cache.at(url).contains(directory_cache_key)) {
-            if (directory_cache_control.at(url).back() != directory_cache_key) {
-                directory_cache_control.at(url).emplace_back(directory_cache_key);
-
-                for (auto it = directory_cache_control.at(url).begin(); it != directory_cache_control.at(url).end();
-                     ++it) {
-                    if (*it == directory_cache_key) {
-                        directory_cache_control.at(url).erase(it);
-                        break;
-                    }
-                }
-            }
+            touchDirectory(url, directory_cache_key);
 
             callback(std::unique_ptr<Response::Error>());
             return;
@@ -593,7 +603,7 @@ private:
                 }
 
                 pmtiles::headerv3 header = header_cache.at(url);
-                std::vector<pmtiles::entryv3> directory = directory_cache.at(url).at(
+                const std::vector<pmtiles::entryv3>& directory = directory_cache.at(url).at(
                     url + "|" + std::to_string(directoryOffset) + "|" + std::to_string(directoryLength));
 
                 pmtiles::entryv3 entry = pmtiles::find_tile(directory, tileID);

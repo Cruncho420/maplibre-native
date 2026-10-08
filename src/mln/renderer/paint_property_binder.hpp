@@ -9,6 +9,7 @@
 #include <mln/renderer/cross_faded_property_evaluator.hpp>
 #include <mln/renderer/paint_property_statistics.hpp>
 #include <mln/renderer/possibly_evaluated_property_value.hpp>
+#include <mln/style/expression/is_constant.hpp>
 #include <mln/util/indexed_tuple.hpp>
 #include <mln/util/literal.hpp>
 #include <mln/util/type_list.hpp>
@@ -169,6 +170,9 @@ public:
     virtual std::size_t getVertexCount() const {
         return interleavedVertexBuffer ? interleavedVertexBuffer->vertexCount : 0;
     }
+
+    /// True if a feature-state change can rewrite this binder's vertex values after layout.
+    virtual bool dependsOnFeatureState() const { return false; }
     virtual void setInterleavedBuffer(InterleavedVertexBuffer&) {}
 
     template <typename VertexFormat>
@@ -190,7 +194,12 @@ public:
 
 namespace detail {
 const gfx::VertexVectorBasePtr noVector;
+
+inline bool dependsOnFeatureState(const style::PropertyExpressionBase& expression) {
+    static const std::array<std::string_view, 1> featureState{"feature-state"};
+    return !style::expression::isGlobalPropertyConstant(expression.getExpression(), featureState);
 }
+} // namespace detail
 
 template <class T, class A>
 class ConstantPaintPropertyBinder : public PaintPropertyBinder<T, T, PossiblyEvaluatedPropertyValue<T>, A> {
@@ -312,9 +321,14 @@ public:
         }
     }
 
+    bool dependsOnFeatureState() const override { return featureStateDependent; }
+
     void updateVertexVectors(const FeatureStates& states,
                              const GeometryTileLayer& layer,
                              const ImagePositions&) override {
+        if (!featureStateDependent) {
+            return; // the values cannot change, and the vertex data may already live only on the GPU
+        }
         for (const auto& it : states) {
             const auto positions = featureMap.find(it.first);
             if (positions == featureMap.end()) {
@@ -370,6 +384,7 @@ private:
     style::PropertyExpression<T> expression;
     T defaultValue;
     FeatureVertexRangeMap featureMap;
+    const bool featureStateDependent = detail::dependsOnFeatureState(expression);
 };
 
 template <class T, class A>
@@ -421,9 +436,14 @@ public:
         }
     }
 
+    bool dependsOnFeatureState() const override { return featureStateDependent; }
+
     void updateVertexVectors(const FeatureStates& states,
                              const GeometryTileLayer& layer,
                              const ImagePositions&) override {
+        if (!featureStateDependent) {
+            return; // the values cannot change, and the vertex data may already live only on the GPU
+        }
         for (const auto& it : states) {
             const auto positions = featureMap.find(it.first);
             if (positions == featureMap.end()) {
@@ -491,6 +511,7 @@ private:
     T defaultValue;
     Range<float> zoomRange;
     FeatureVertexRangeMap featureMap;
+    const bool featureStateDependent = detail::dependsOnFeatureState(expression);
 };
 
 template <class T, class A1, class A2>
@@ -730,6 +751,18 @@ public:
                              const ImagePositions& imagePositions) {
         util::ignore({(binders.template get<Ps>()->updateVertexVectors(states, layer, imagePositions), 0)...});
         interleavedVertexBuffer.sharedVertexVector->updateModified(true);
+    }
+
+    /// Layout is final: free the CPU copy of the paint vertex data once it is on the GPU, unless a
+    /// feature-state change could still rewrite it.
+    void release() {
+        bool featureStateDependent = false;
+        util::ignore({(featureStateDependent = featureStateDependent ||
+                                              binders.template get<Ps>()->dependsOnFeatureState(),
+                       0)...});
+        if (!featureStateDependent) {
+            interleavedVertexBuffer.sharedVertexVector->release();
+        }
     }
 
     void setPatternParameters(const std::optional<ImagePosition>& posA,
