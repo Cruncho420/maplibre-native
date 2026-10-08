@@ -104,7 +104,9 @@ const gfx::UniqueVertexBufferResource& UploadPass::getBuffer(const gfx::VertexVe
             // If the already-allocated buffer is large enough, we can re-use it
             if (rawBufSize <= resource.getSizeInBytes()) {
                 // If the source changed, update the buffer contents
-                if (forceUpdate || vec->isModifiedAfter(resource.getLastUpdated())) {
+                // No raw data = the producer released it after this buffer was made (Line/FillBucket::upload):
+                // the buffer already holds the final contents, and there is nothing to re-upload from.
+                if (rawBufPtr && (forceUpdate || vec->isModifiedAfter(resource.getLastUpdated()))) {
                     updateVertexBufferResource(resource, rawBufPtr, rawBufSize);
                     resource.setLastUpdated(vec->getLastModified());
                 }
