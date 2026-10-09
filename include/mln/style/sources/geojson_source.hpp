@@ -55,6 +55,15 @@ public:
     virtual Features getChildren(std::uint32_t) = 0;
     virtual Features getLeaves(std::uint32_t, std::uint32_t limit, std::uint32_t offset) = 0;
     virtual std::uint8_t getClusterExpansionZoom(std::uint32_t) = 0;
+
+    /// True when created from an empty FeatureCollection: every tile of it is empty.
+    bool isEmpty() const { return empty; }
+
+private:
+    static std::shared_ptr<GeoJSONData> createData(const GeoJSON&,
+                                                   std::shared_ptr<Scheduler> sequencedScheduler,
+                                                   const Immutable<GeoJSONOptions>&);
+    bool empty = false;
 };
 
 // NOTE: Any derived class must invalidate `weakFactory` in the destructor

@@ -103,8 +103,10 @@ void RenderGeoJSONSource::update(Immutable<style::Source::Impl> baseImpl_,
 
     if (!data_) return;
 
+    // An empty FeatureCollection has nothing to draw in any tile: keep no tiles for it instead of covering the
+    // viewport with empty tiles and updating them every frame (route overlays that are empty most of a drive).
     tilePyramid.update(layers,
-                       needsRendering,
+                       needsRendering && !data_->isEmpty(),
                        needsRelayout,
                        parameters,
                        *baseImpl,
