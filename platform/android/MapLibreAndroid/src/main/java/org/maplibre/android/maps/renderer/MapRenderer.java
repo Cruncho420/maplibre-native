@@ -50,6 +50,7 @@ public abstract class MapRenderer implements MapRendererScheduler {
   // Holds the pointer to the native peer after initialization
   private long nativePtr = 0;
   private double expectedRenderTime = 0;
+  private final FramePacer framePacer;
   private MapLibreMap.OnFpsChangedListener onFpsChangedListener;
 
   public static MapRenderer create(MapLibreMapOptions options, @NonNull Context context, Runnable initCallback) {
@@ -73,6 +74,7 @@ public abstract class MapRenderer implements MapRendererScheduler {
 
   public MapRenderer(@NonNull Context context, String localIdeographFontFamily) {
     float pixelRatio = context.getResources().getDisplayMetrics().density;
+    framePacer = new FramePacer(this);
 
     // Initialize native peer
     nativeInitialize(this, pixelRatio, localIdeographFontFamily);
@@ -132,9 +134,11 @@ public abstract class MapRenderer implements MapRendererScheduler {
       Logger.e(TAG, error.getMessage());
     }
     long renderTime = System.nanoTime() - startTime;
-    if (renderTime < expectedRenderTime) {
+    if (expectedRenderTime > 0) {
       try {
-        Thread.sleep((long) ((expectedRenderTime - renderTime) / 1E6));
+        if (!framePacer.pace(expectedRenderTime) && renderTime < expectedRenderTime) {
+          Thread.sleep((long) ((expectedRenderTime - renderTime) / 1E6));
+        }
       } catch (InterruptedException ex) {
         Logger.e(TAG, ex.getMessage());
       }
