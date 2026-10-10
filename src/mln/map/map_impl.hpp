@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mln/geometry/feature_index.hpp>
 #include <mln/annotation/annotation_manager.hpp>
 #include <mln/map/map.hpp>
 #include <mln/map/map_observer.hpp>
@@ -105,6 +106,7 @@ public:
     bool cameraMutated = false;
 
     uint8_t prefetchZoomDelta = util::DEFAULT_PREFETCH_ZOOM_DELTA;
+    const std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter = std::make_shared<FeatureIndexLayerFilter>();
 
     bool loading = false;
     bool rendererFullyLoaded;

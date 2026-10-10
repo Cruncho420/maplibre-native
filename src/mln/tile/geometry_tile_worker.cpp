@@ -42,6 +42,7 @@ GeometryTileWorker::GeometryTileWorker(OptionalActorRef<GeometryTileWorker> self
                                        const bool showCollisionBoxes_,
                                        gfx::DynamicTextureAtlasPtr dynamicTextureAtlas_,
                                        std::shared_ptr<FontFaces> fontFaces_,
+                                       std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter_,
                                        TileObserver* observer_)
     : self(std::move(self_)),
       parent(std::move(parent_)),
@@ -54,6 +55,7 @@ GeometryTileWorker::GeometryTileWorker(OptionalActorRef<GeometryTileWorker> self
       showCollisionBoxes(showCollisionBoxes_),
       dynamicTextureAtlas(dynamicTextureAtlas_),
       fontFaces(fontFaces_),
+      featureIndexLayerFilter(std::move(featureIndexLayerFilter_)),
       observer(observer_) {}
 
 GeometryTileWorker::~GeometryTileWorker() {
@@ -432,7 +434,8 @@ void GeometryTileWorker::parse() {
     renderData.clear();
     layouts.clear();
 
-    featureIndex = std::make_unique<FeatureIndex>(*data ? (*data)->clone() : nullptr);
+    featureIndex = std::make_unique<FeatureIndex>(*data ? (*data)->clone() : nullptr,
+                                                  featureIndexLayerFilter ? featureIndexLayerFilter->get() : nullptr);
 
     // Avoid small reallocations for populated cells.
     // If we had a total feature count, this could be based on that and the cell count.

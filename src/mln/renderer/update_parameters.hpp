@@ -17,6 +17,8 @@
 
 namespace mln {
 
+class FeatureIndexLayerFilter;
+
 class AnnotationManager;
 class FileSource;
 
@@ -55,6 +57,8 @@ public:
     double tileLodPitchThreshold = (60.0 / 180.0) * std::numbers::pi;
     double tileLodZoomShift = 0;
     TileLodMode tileLodMode = TileLodMode::Default;
+
+    std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter; // the map's; null = index every layer
 };
 
 } // namespace mln

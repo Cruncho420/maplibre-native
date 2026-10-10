@@ -256,6 +256,8 @@ interface NativeMap {
   @IntRange(from = 0)
   int getPrefetchZoomDelta();
 
+  void setFeatureIndexLayerPrefixes(@NonNull String[] prefixes);
+
   void setTileCacheEnabled(boolean enabled);
 
   boolean getTileCacheEnabled();

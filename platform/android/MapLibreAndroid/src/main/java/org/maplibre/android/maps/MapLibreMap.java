@@ -326,6 +326,19 @@ public final class MapLibreMap {
   }
 
   /**
+   * Index only these style layers' line/fill/circle features for {@link #queryRenderedFeatures}: an
+   * entry matches a layer id equal to it or, ending in '*', every id starting with the part before it.
+   * Other layers draw as before but are not queryable on this map (symbol layers stay queryable), which
+   * saves the per-tile query index memory. An empty array (the default) indexes every layer. Applies to
+   * every tile whose parse starts after the call (a tile mid-parse keeps the previous list).
+   *
+   * @param prefixes layer ids (or 'prefix*' entries) to keep queryable
+   */
+  public void setFeatureIndexLayerPrefixes(@NonNull String[] prefixes) {
+    nativeMapView.setFeatureIndexLayerPrefixes(prefixes);
+  }
+
+  /**
    * Set the tile pre-fetching zoom delta. Pre-fetching makes sure that a low-resolution
    * tile at the (current_zoom_level - delta) is rendered as soon as possible at the
    * expense of a little bandwidth.

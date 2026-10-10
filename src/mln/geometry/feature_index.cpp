@@ -117,14 +117,41 @@ IndexedSubfeature& IndexedSubfeature::operator=(IndexedSubfeature&& other) {
     return *this;
 }
 
-FeatureIndex::FeatureIndex(std::unique_ptr<const GeometryTileData> tileData_)
+void FeatureIndexLayerFilter::set(std::vector<std::string> entries_) {
+    auto next = entries_.empty() ? nullptr : std::make_shared<const std::vector<std::string>>(std::move(entries_));
+    std::scoped_lock lock(mutex);
+    entries = std::move(next);
+}
+
+std::shared_ptr<const std::vector<std::string>> FeatureIndexLayerFilter::get() const {
+    std::scoped_lock lock(mutex);
+    return entries;
+}
+
+bool FeatureIndexLayerFilter::matches(const std::vector<std::string>& list, const std::string& layerID) {
+    for (const auto& entry : list) {
+        if (!entry.empty() && entry.back() == '*') {
+            if (layerID.compare(0, entry.size() - 1, entry, 0, entry.size() - 1) == 0) return true;
+        } else if (layerID == entry) {
+            return true;
+        }
+    }
+    return false;
+}
+
+FeatureIndex::FeatureIndex(std::unique_ptr<const GeometryTileData> tileData_,
+                           std::shared_ptr<const std::vector<std::string>> layerPrefixes_)
     : grid(util::EXTENT, util::EXTENT, util::EXTENT / 16), // 16x16 grid -> 32px cell
+      layerPrefixes(std::move(layerPrefixes_)),
       tileData(std::move(tileData_)) {}
 
 void FeatureIndex::insert(const GeometryCollection& geometries,
                           std::size_t index,
                           const std::string& sourceLayerName,
                           const std::string& bucketLeaderID) {
+    if (layerPrefixes && !FeatureIndexLayerFilter::matches(*layerPrefixes, bucketLeaderID)) {
+        return; // this map never queries the layer: no grid entry, no feature reference
+    }
     if (uniqueLayerIDs.empty()) {
         uniqueLayerIDs.reserve(expectedUniqueLayerIDs);
     }

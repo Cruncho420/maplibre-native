@@ -8,6 +8,8 @@
 #include <mln/util/grid_index.hpp>
 #include <mln/util/mat4.hpp>
 
+#include <memory>
+#include <mutex>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -104,9 +106,27 @@ protected:
     std::vector<FeatureRecord> features;
 };
 
+/// Which layers a map indexes for rendered-feature queries (Map::setFeatureIndexLayerPrefixes). One per map, shared
+/// with every tile worker, read when a tile starts parsing, so a change reaches every tile parsed afterwards.
+/// An entry matches a layer id equal to it, or, when it ends in '*', every id starting with the part before the '*'.
+/// Empty = every layer (stock). Only line/fill/circle/fill-extrusion features use the FeatureIndex grid; symbol
+/// layers stay queryable through the collision index whatever the list says.
+class FeatureIndexLayerFilter {
+public:
+    void set(std::vector<std::string> entries);
+    std::shared_ptr<const std::vector<std::string>> get() const; // null = every layer
+    static bool matches(const std::vector<std::string>& entries, const std::string& layerID);
+
+private:
+    mutable std::mutex mutex;
+    std::shared_ptr<const std::vector<std::string>> entries;
+};
+
 class FeatureIndex {
 public:
-    FeatureIndex(std::unique_ptr<const GeometryTileData> tileData_);
+    /// `layerPrefixes_`: index only features of buckets whose leader layer id matches (FeatureIndexLayerFilter; null = all).
+    FeatureIndex(std::unique_ptr<const GeometryTileData> tileData_,
+                 std::shared_ptr<const std::vector<std::string>> layerPrefixes_ = nullptr);
 
     const GeometryTileData* getData() { return tileData.get(); }
 
@@ -158,6 +178,7 @@ private:
                     const SourceFeatureState* sourceFeatureState) const;
 
     GridIndex<RefIndexedSubfeature> grid;
+    std::shared_ptr<const std::vector<std::string>> layerPrefixes;
     unsigned int sortIndex = 0;
 
     // mln::unordered_* cannot be used here, as we rely on holding references to elements:

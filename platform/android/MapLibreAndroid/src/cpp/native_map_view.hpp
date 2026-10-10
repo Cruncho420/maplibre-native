@@ -316,6 +316,8 @@ public:
 
     jni::jint getPrefetchZoomDelta(JNIEnv&);
 
+    void setFeatureIndexLayerPrefixes(JNIEnv&, const jni::Array<jni::String>&);
+
     void setTileCacheEnabled(JNIEnv&, jni::jboolean);
 
     jni::jboolean getTileCacheEnabled(JNIEnv&);
