@@ -45,6 +45,7 @@ public:
                        bool showCollisionBoxes_,
                        gfx::DynamicTextureAtlasPtr,
                        std::shared_ptr<FontFaces> fontFaces,
+                       std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter,
                        TileObserver* observer);
     ~GeometryTileWorker();
 
@@ -126,6 +127,7 @@ private:
     gfx::DynamicTextureAtlasPtr dynamicTextureAtlas;
 
     std::shared_ptr<FontFaces> fontFaces;
+    std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter; // the map's; read when a tile starts parsing
 
     TileObserver* observer;
 };

@@ -1325,6 +1325,14 @@ jni::jint NativeMapView::getPrefetchZoomDelta(JNIEnv&) {
     return jni::jint(map->getPrefetchZoomDelta());
 }
 
+void NativeMapView::setFeatureIndexLayerPrefixes(JNIEnv& env, const jni::Array<jni::String>& prefixes) {
+    std::vector<std::string> list;
+    if (prefixes && prefixes.Length(env) > 0) {
+        list = android::conversion::toVector(env, prefixes);
+    }
+    map->setFeatureIndexLayerPrefixes(std::move(list));
+}
+
 void NativeMapView::setTileCacheEnabled(JNIEnv&, jni::jboolean enabled) {
     rendererFrontend->setTileCacheEnabled(enabled);
 }
@@ -1505,6 +1513,7 @@ void NativeMapView::registerNative(jni::JNIEnv& env) {
         METHOD(&NativeMapView::getPrefetchTiles, "nativeGetPrefetchTiles"),
         METHOD(&NativeMapView::setPrefetchZoomDelta, "nativeSetPrefetchZoomDelta"),
         METHOD(&NativeMapView::getPrefetchZoomDelta, "nativeGetPrefetchZoomDelta"),
+        METHOD(&NativeMapView::setFeatureIndexLayerPrefixes, "nativeSetFeatureIndexLayerPrefixes"),
         METHOD(&NativeMapView::setTileCacheEnabled, "nativeSetTileCacheEnabled"),
         METHOD(&NativeMapView::getTileCacheEnabled, "nativeGetTileCacheEnabled"),
         METHOD(&NativeMapView::setTileLodMinRadius, "nativeSetTileLodMinRadius"),

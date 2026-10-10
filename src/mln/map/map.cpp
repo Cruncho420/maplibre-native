@@ -532,6 +532,15 @@ uint8_t Map::getPrefetchZoomDelta() const {
     return impl->prefetchZoomDelta;
 }
 
+void Map::setFeatureIndexLayerPrefixes(std::vector<std::string> prefixes) {
+    impl->featureIndexLayerFilter->set(std::move(prefixes));
+}
+
+std::vector<std::string> Map::getFeatureIndexLayerPrefixes() const {
+    const auto entries = impl->featureIndexLayerFilter->get();
+    return entries ? *entries : std::vector<std::string>{};
+}
+
 bool Map::isFullyLoaded() const {
     return impl->style->impl->isLoaded() && impl->rendererFullyLoaded;
 }

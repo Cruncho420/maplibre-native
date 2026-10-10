@@ -3177,6 +3177,24 @@ static void *windowScreenContext = &windowScreenContext;
   return self.mbglMap.getPrefetchZoomDelta() > 0 ? YES : NO;
 }
 
+- (void)setFeatureIndexLayerIdentifierPrefixes:(NSArray<NSString *> *)prefixes {
+  std::vector<std::string> list;
+  for (NSString *prefix in prefixes) {
+    list.emplace_back(prefix.UTF8String);
+  }
+  self.mbglMap.setFeatureIndexLayerPrefixes(std::move(list));
+}
+
+- (NSArray<NSString *> *)featureIndexLayerIdentifierPrefixes {
+  const auto &list = self.mbglMap.getFeatureIndexLayerPrefixes();
+  if (list.empty()) return nil;
+  NSMutableArray<NSString *> *prefixes = [NSMutableArray arrayWithCapacity:list.size()];
+  for (const auto &prefix : list) {
+    [prefixes addObject:@(prefix.c_str())];
+  }
+  return prefixes;
+}
+
 - (void)setTileCacheEnabled:(BOOL)enabled {
   _rendererFrontend->setTileCacheEnabled(enabled);
 }

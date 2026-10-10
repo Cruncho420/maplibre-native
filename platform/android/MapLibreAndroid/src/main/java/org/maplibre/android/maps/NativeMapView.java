@@ -842,6 +842,14 @@ final class NativeMapView implements NativeMap {
   }
 
   @Override
+  public void setFeatureIndexLayerPrefixes(@NonNull String[] prefixes) {
+    if (checkState("nativeSetFeatureIndexLayerPrefixes")) {
+      return;
+    }
+    nativeSetFeatureIndexLayerPrefixes(prefixes);
+  }
+
+  @Override
   public void setTileCacheEnabled(boolean enabled) {
     if (checkState("setTileCacheEnabled")) {
       return;
@@ -1782,6 +1790,9 @@ final class NativeMapView implements NativeMap {
 
   @Keep
   private native void nativeSetPrefetchZoomDelta(int delta);
+
+  @Keep
+  private native void nativeSetFeatureIndexLayerPrefixes(String[] prefixes);
 
   @Keep
   private native void nativeSetTileCacheEnabled(boolean enabled);

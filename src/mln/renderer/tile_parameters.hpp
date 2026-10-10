@@ -4,11 +4,15 @@
 #include <mln/actor/scheduler.hpp>
 
 #include <memory>
+#include <string>
+#include <vector>
 #include <numbers>
 
 #include <mapbox/std/weak.hpp>
 
 namespace mln {
+
+class FeatureIndexLayerFilter;
 
 class TransformState;
 class FileSource;
@@ -40,6 +44,7 @@ public:
     TileLodMode tileLodMode = TileLodMode::Default;
     gfx::DynamicTextureAtlasPtr dynamicTextureAtlas;
     bool isUpdateSynchronous = false;
+    std::shared_ptr<FeatureIndexLayerFilter> featureIndexLayerFilter; // the map's; null = index every layer
 };
 
 } // namespace mln

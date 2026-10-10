@@ -478,6 +478,15 @@ MLN_EXPORT
 @property (nonatomic, assign) BOOL prefetchesTiles;
 
 /**
+ Style layers whose line, fill and circle features this map indexes for `-visibleFeaturesAtPoint:` and related
+ queries. An entry matches a layer identifier equal to it or, when it ends in `*`, every identifier starting with
+ the part before the `*`. Other layers are drawn but their line/fill/circle features are not queryable on this map,
+ which saves the memory of the per-tile query index (symbol layers stay queryable). `nil` or an empty array (the
+ default) indexes every layer. Applies to every tile whose parse starts after the property is set (a tile mid-parse keeps the previous list).
+ */
+@property (nonatomic, copy, nullable) NSArray<NSString *> *featureIndexLayerIdentifierPrefixes;
+
+/**
  A Boolean value indicating whether the map may cache tiles for different zoom levels or not.
 
  When this property is set to `YES`,  the map view consumes more memory and

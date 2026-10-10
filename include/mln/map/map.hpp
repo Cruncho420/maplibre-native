@@ -143,6 +143,13 @@ public:
     void setPrefetchZoomDelta(uint8_t delta);
     uint8_t getPrefetchZoomDelta() const;
 
+    /// Build the rendered-feature query index (queryRenderedFeatures) only for these layers: an entry matches a layer
+    /// id equal to it or, ending in '*', every id starting with the part before it. An empty list (the default)
+    /// indexes every layer. Line/fill/circle features of other layers are then not queryable on this map (symbol
+    /// layers stay queryable). Applies to every tile whose parse starts after the call (a tile mid-parse keeps the previous list).
+    void setFeatureIndexLayerPrefixes(std::vector<std::string> prefixes);
+    std::vector<std::string> getFeatureIndexLayerPrefixes() const;
+
     // Debug
     void setDebug(MapDebugOptions);
     MapDebugOptions getDebug() const;
