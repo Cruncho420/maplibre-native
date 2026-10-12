@@ -126,6 +126,7 @@ void RenderFillLayer::update(gfx::ShaderRegistry& shaders,
                              UniqueChangeRequestVec& changes) {
     if (!renderTiles || renderTiles->empty()) {
         removeAllDrawables();
+        keptProperties.clear();
         return;
     }
 
@@ -164,6 +165,7 @@ void RenderFillLayer::update(gfx::ShaderRegistry& shaders,
     }
     if (!fillShaderGroup || !outlineShaderGroup || !patternShaderGroup || !outlinePatternShaderGroup) {
         removeAllDrawables();
+        keptProperties.clear();
         return;
     }
 
@@ -189,6 +191,7 @@ void RenderFillLayer::update(gfx::ShaderRegistry& shaders,
 
     fillTileLayerGroup->setStencilTiles(renderTiles);
 
+    nextKeptProperties.clear();
     StringIDSetsPair propertiesAsUniforms;
     for (const RenderTile& tile : *renderTiles) {
         const auto& tileID = tile.getOverscaledTileID();
@@ -208,6 +211,21 @@ void RenderFillLayer::update(gfx::ShaderRegistry& shaders,
             removeTile(renderPass, tileID);
         }
         setRenderTileBucketID(tileID, bucket.getID());
+
+        // Same bucket and same evaluated properties as the last update: the drawables' vertex attributes, segments
+        // and vertex arrays are still exact (data-driven attributes share the binders' vectors, whose changes the
+        // upload pass tracks), so keep them instead of rebuilding every frame.
+        const auto kept = std::find_if(keptProperties.begin(), keptProperties.end(), [&](const auto& entry) {
+            return entry.first == tileID;
+        });
+        const bool sameSource = prevBucketID == bucket.getID() && kept != keptProperties.end() &&
+                                kept->second == renderData->layerProperties;
+        nextKeptProperties.emplace_back(tileID, renderData->layerProperties);
+        if (sameSource && updateTile(renderPass, tileID, [&](gfx::Drawable& drawable) {
+                return drawable.getLayerTweaker() == layerTweaker;
+            })) {
+            continue;
+        }
 
         const auto& evaluated = getEvaluated<FillLayerProperties>(renderData->layerProperties);
 
@@ -538,6 +556,7 @@ void RenderFillLayer::update(gfx::ShaderRegistry& shaders,
             }
         }
     }
+    keptProperties.swap(nextKeptProperties);
 }
 
 } // namespace mln
