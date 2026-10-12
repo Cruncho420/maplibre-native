@@ -5,6 +5,7 @@
 #include <mln/style/layers/symbol_layer_impl.hpp>
 #include <mln/text/cross_tile_symbol_index.hpp>
 #include <mln/text/placement.hpp>
+#include <mln/util/monotonic_timer.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -262,7 +263,15 @@ void SymbolBucket::sortFeatures(const float angle) {
 }
 
 SymbolInstanceReferences SymbolBucket::getSortedSymbols(const float angle) const {
-    SymbolInstanceReferences result(symbolInstances.begin(), symbolInstances.end());
+    // The sort reads every instance's anchor and feature index, so only instances that pass their own guard check are
+    // sorted (the bucket-level guard scan may be up to 250 ms old, see check()).
+    SymbolInstanceReferences result;
+    result.reserve(symbolInstances.size());
+    for (const SymbolInstance& symbolInstance : symbolInstances) {
+        if (symbolInstance.check(SYM_GUARD_LOC)) {
+            result.emplace_back(symbolInstance);
+        }
+    }
     const float sin = std::sin(angle);
     const float cos = std::cos(angle);
 
@@ -301,11 +310,19 @@ bool SymbolBucket::check(source_location source) {
         return false;
     }
 
+    // A full scan per bucket at most every 250 ms (stock: twice per frame per layer drawing the bucket). A failed
+    // instance stays failed and is caught by the next scan; layout and placement still check each instance they use.
+    constexpr std::chrono::duration<double> guardScanInterval{0.25};
+    const auto now = util::MonotonicTimer::now();
+    if (guardsCheckedAt && now - *guardsCheckedAt < guardScanInterval) {
+        return true;
+    }
     for (std::size_t i = 0; i < symbolInstances.size(); ++i) {
         if (!symbolInstances[i].check(source)) {
             return false;
         }
     }
+    guardsCheckedAt = now;
     return true;
 }
 #endif

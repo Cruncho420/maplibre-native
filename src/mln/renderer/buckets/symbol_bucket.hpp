@@ -294,6 +294,13 @@ public:
 
 #if MLN_SYMBOL_GUARDS
     bool check(source_location) override;
+
+private:
+    /// When the last full guard scan of every symbol instance passed (render-thread only). The scan runs at most once
+    /// per `guardScanInterval` per bucket instead of on every frame for every layer that draws the bucket.
+    std::optional<std::chrono::duration<double>> guardsCheckedAt;
+
+public:
 #endif
 
 #if MLN_USE_SYMBOL_INSTANCING

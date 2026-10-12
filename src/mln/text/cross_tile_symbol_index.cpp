@@ -47,7 +47,7 @@ void TileLayerIndex::findMatches(SymbolBucket& bucket,
     if (bucket.bucketLeaderID != bucketLeaderId) return;
 
     for (auto& symbolInstance : symbolInstances) {
-        if (symbolInstance.getCrossTileID() || !symbolInstance.check(SYM_GUARD_LOC)) {
+        if (!symbolInstance.check(SYM_GUARD_LOC) || symbolInstance.getCrossTileID()) {
             // already has a match, skip
             continue;
         }

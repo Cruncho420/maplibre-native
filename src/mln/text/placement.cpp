@@ -662,6 +662,9 @@ SymbolInstanceReferences Placement::getSortedSymbols(const BucketPlacementData& 
     const auto& bucket = static_cast<const SymbolBucket&>(params.bucket.get());
     SymbolInstanceReferences sortedSymbols = getBucketSymbols(
         bucket, params.sortKeyRange, collisionIndex.getTransformState().getBearing());
+    // The comparator below reads each instance's cross-tile ID: drop instances that fail their own guard check first
+    // (the bucket-level scan may be up to 250 ms old, see SymbolBucket::check).
+    std::erase_if(sortedSymbols, [](const SymbolInstance& symbol) { return !symbol.check(SYM_GUARD_LOC); });
     auto* previousPlacement = getPrevPlacement();
     if (previousPlacement && isTiltedView()) {
         std::stable_sort(sortedSymbols.begin(),
