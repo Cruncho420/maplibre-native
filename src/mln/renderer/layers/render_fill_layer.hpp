@@ -62,6 +62,12 @@ private:
 #if MLN_TRIANGULATE_FILL_OUTLINES
     gfx::ShaderGroupPtr outlineTriangulatedShaderGroup;
 #endif // MLN_TRIANGULATE_FILL_OUTLINES
+
+    /// The evaluated properties each tile's drawables were last updated from (with the bucket ID in `renderTileIDs`):
+    /// while both are unchanged, the drawables keep their vertex attributes and vertex arrays (stock: rebuilt every
+    /// frame for every tile). Holding the properties keeps the pointer from being reused by a newer object.
+    std::vector<std::pair<OverscaledTileID, Immutable<style::LayerProperties>>> keptProperties;
+    std::vector<std::pair<OverscaledTileID, Immutable<style::LayerProperties>>> nextKeptProperties;
 };
 
 } // namespace mln
