@@ -53,6 +53,13 @@ public:
     bool removeStaleBuckets(const std::unordered_set<uint32_t>& currentIDs);
     void handleWrapJump(float newLng);
 
+    /// False: an already indexed bucket is not re-indexed only because some of its symbols were outside the
+    /// viewport filter of an overscaled tile (hasUninitializedSymbols); uninitializedPending records that one was
+    /// skipped. Those symbols have no cross-tile ID, so placement hides them either way: the re-index only has
+    /// to happen before the next placement, not on every frame.
+    bool refreshUninitialized = true;
+    bool uninitializedPending = false;
+
 private:
     void removeBucketCrossTileIDs(uint8_t zoom, const TileLayerIndex& removedBucket);
 
@@ -69,10 +76,12 @@ public:
     enum class AddLayerResult : uint8_t {
         NoChanges = 0,
         BucketsAdded = 1 << 0,
-        BucketsRemoved = 1 << 1
+        BucketsRemoved = 1 << 1,
+        /// Buckets with off-viewport symbols were not re-indexed (refreshUninitialized = false).
+        UninitializedPending = 1 << 2
     };
 
-    AddLayerResult addLayer(const RenderLayer& layer, float lng);
+    AddLayerResult addLayer(const RenderLayer& layer, float lng, bool refreshUninitialized = true);
     void pruneUnusedLayers(const std::set<std::string>&);
 
     void reset();

@@ -119,6 +119,14 @@ bool isInVewport(const mat4& posMatrix, const Point<float>& point) {
     return (x > -edge && y > -edge && x < edge && y < edge);
 }
 
+// Placement::updateBucketOpacities shows a symbol that placement has not seen yet only for allow-overlap layers of a
+// just-reloaded (or screen-space) bucket; such buckets are always re-indexed at once, as in stock.
+bool mayShowBeforePlacement(const SymbolBucket& bucket) {
+    const bool screenSpace = bucket.layout->get<style::SymbolScreenSpace>();
+    return (screenSpace || bucket.justReloaded) &&
+           (bucket.layout->get<style::TextAllowOverlap>() || bucket.layout->get<style::IconAllowOverlap>());
+}
+
 } // namespace
 
 bool CrossTileSymbolLayerIndex::addBucket(const OverscaledTileID& tileID,
@@ -127,7 +135,9 @@ bool CrossTileSymbolLayerIndex::addBucket(const OverscaledTileID& tileID,
     auto& thisZoomIndexes = indexes[tileID.overscaledZ];
     auto previousIndex = thisZoomIndexes.find(tileID);
     if (previousIndex != thisZoomIndexes.end()) {
-        if (previousIndex->second.bucketInstanceId == bucket.bucketInstanceId && !bucket.hasUninitializedSymbols) {
+        if (previousIndex->second.bucketInstanceId == bucket.bucketInstanceId &&
+            (!bucket.hasUninitializedSymbols || (!refreshUninitialized && !mayShowBeforePlacement(bucket)))) {
+            uninitializedPending = uninitializedPending || bucket.hasUninitializedSymbols;
             return false;
         } else {
             // We're replacing this bucket with an updated version
@@ -220,7 +230,7 @@ bool CrossTileSymbolLayerIndex::removeStaleBuckets(const std::unordered_set<uint
 
 CrossTileSymbolIndex::CrossTileSymbolIndex() = default;
 
-auto CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng) -> AddLayerResult {
+auto CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng, bool refreshUninitialized) -> AddLayerResult {
     MLN_TRACE_FUNC();
     MLN_ZONE_STR(layer.getID());
 
@@ -238,6 +248,8 @@ auto CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng) -> AddL
     std::unordered_set<uint32_t> currentBucketIDs;
 
     layerIndex.handleWrapJump(lng);
+    layerIndex.refreshUninitialized = refreshUninitialized;
+    layerIndex.uninitializedPending = false;
 
     for (const auto& item : layer.getPlacementData()) {
         const RenderTile& renderTile = item.tile;
@@ -249,6 +261,8 @@ auto CrossTileSymbolIndex::addLayer(const RenderLayer& layer, float lng) -> AddL
     }
 
     if (layerIndex.removeStaleBuckets(currentBucketIDs)) result |= AddLayerResult::BucketsRemoved;
+    if (layerIndex.uninitializedPending) result |= AddLayerResult::UninitializedPending;
+    layerIndex.refreshUninitialized = true;
 
     return result;
 }

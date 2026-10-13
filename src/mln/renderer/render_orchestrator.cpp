@@ -472,14 +472,30 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
     bool symbolBucketsAdded = false;
     std::set<std::string> usedSymbolLayers;
     const auto longitude = static_cast<float>(updateParameters->transformState.getLatLng().longitude());
+    // Buckets of overscaled tiles keep symbols outside the (2x) viewport un-indexed and stock MapLibre re-indexed
+    // them on EVERY frame while the camera moves, which also forced a full symbol opacity rewrite every frame.
+    // Placement is what shows a symbol, so they are re-indexed only on frames that run placement (below, before
+    // Placement::create, in the same layer order). A skipped bucket still counts as "added" for the
+    // placement-period override, so placement runs exactly when it did before.
+    const bool placementDue = !isMapModeContinuous ||
+                              !placementController.placementIsRecent(
+                                  updateParameters->timePoint,
+                                  static_cast<float>(updateParameters->transformState.getZoom()),
+                                  std::nullopt);
+    bool uninitializedPending = false;
     for (auto it = layersNeedPlacement.crbegin(); it != layersNeedPlacement.crend(); ++it) {
         MLN_TRACE_ZONE(placement layer);
         RenderLayer& layer = *it;
-        auto result = crossTileSymbolIndex.addLayer(layer, longitude);
+        auto result = crossTileSymbolIndex.addLayer(layer, longitude, placementDue);
         if (isMapModeContinuous) {
             usedSymbolLayers.insert(layer.getID());
-            symbolBucketsAdded = symbolBucketsAdded || (result & CrossTileSymbolIndex::AddLayerResult::BucketsAdded);
-            symbolBucketsChanged = symbolBucketsChanged || (result != CrossTileSymbolIndex::AddLayerResult::NoChanges);
+            const bool pending = result & CrossTileSymbolIndex::AddLayerResult::UninitializedPending;
+            uninitializedPending = uninitializedPending || pending;
+            symbolBucketsAdded = symbolBucketsAdded || pending ||
+                                 (result & CrossTileSymbolIndex::AddLayerResult::BucketsAdded);
+            symbolBucketsChanged = symbolBucketsChanged ||
+                                   (result & CrossTileSymbolIndex::AddLayerResult::BucketsAdded) ||
+                                   (result & CrossTileSymbolIndex::AddLayerResult::BucketsRemoved);
         }
     }
 
@@ -506,6 +522,12 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
             placementUpdatePeriodOverride);
         symbolBucketsChanged |= renderTreeParameters->placementChanged;
         if (renderTreeParameters->placementChanged) {
+            if (uninitializedPending) {
+                // Only the shorter override period made placement due: index what was skipped above first.
+                for (auto it = layersNeedPlacement.crbegin(); it != layersNeedPlacement.crend(); ++it) {
+                    crossTileSymbolIndex.addLayer(*it, longitude, true);
+                }
+            }
             Mutable<Placement> placement = Placement::create(updateParameters, placementController.getPlacement());
             placement->placeLayers(layersNeedPlacement);
             placementController.setPlacement(std::move(placement));
