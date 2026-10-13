@@ -1447,7 +1447,9 @@ void SymbolLayout::addToDebugBuffers(SymbolBucket& bucket) {
                 segment.indexLength += indexLength;
             }
         };
-        symbolInstance.check(SYM_GUARD_LOC);
+        if (!symbolInstance.check(SYM_GUARD_LOC)) {
+            continue;
+        }
         populateCollisionBox(symbolInstance.getTextCollisionFeature(), true /*isText*/);
         if (symbolInstance.getVerticalTextCollisionFeature()) {
             populateCollisionBox(*symbolInstance.getVerticalTextCollisionFeature(), true /*isText*/);
