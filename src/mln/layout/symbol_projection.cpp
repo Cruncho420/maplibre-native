@@ -178,31 +178,24 @@ bool isVisible(const vec4& anchorPos, const std::array<double, 2>& clippingBuffe
     return inPaddedViewport;
 }
 
+#if MLN_USE_SYMBOL_INSTANCING
+constexpr size_t dynamicVerticesPerGlyph = 1;
+#else
+constexpr size_t dynamicVerticesPerGlyph = 4;
+#endif
+
 void addDynamicAttributes(const Point<float>& anchorPoint,
                           const float angle,
                           SymbolBucket::DynamicAttributeVector& dynamicAttributeData) {
-    auto dynamicAttributes = SymbolBucket::dynamicLayoutAttributes(anchorPoint, angle);
-    dynamicAttributeData.emplace_back(dynamicAttributes);
-#if !MLN_USE_SYMBOL_INSTANCING
-    dynamicAttributeData.emplace_back(dynamicAttributes);
-    dynamicAttributeData.emplace_back(dynamicAttributes);
-    dynamicAttributeData.emplace_back(dynamicAttributes);
-#endif
+    // One fill of the glyph's vertices (same values as one emplace per vertex).
+    dynamicAttributeData.extend(dynamicVerticesPerGlyph, SymbolBucket::dynamicLayoutAttributes(anchorPoint, angle));
 }
 
 void hideGlyphs(size_t numGlyphs, SymbolBucket::DynamicAttributeVector& dynamicVertexArray) {
-#if MLN_USE_SYMBOL_INSTANCING
-    const size_t count = 1;
-#else
-    const size_t count = 4;
-#endif
+    // Every vertex of every hidden glyph gets the same off-screen value: one fill instead of a loop of emplaces.
     const Point<float> offscreenPoint = {-INFINITY, -INFINITY};
-    if (dynamicVertexArray.empty()) {
-        dynamicVertexArray.reserve(count * numGlyphs);
-    }
-    for (size_t i = 0; i < numGlyphs; i++) {
-        addDynamicAttributes(offscreenPoint, 0, dynamicVertexArray);
-    }
+    dynamicVertexArray.extend(dynamicVerticesPerGlyph * numGlyphs,
+                              SymbolBucket::dynamicLayoutAttributes(offscreenPoint, 0));
 }
 
 enum PlacementResult {
