@@ -97,6 +97,14 @@ T evaluateFeature(const mapbox::feature::feature<double>& f,
 std::shared_ptr<GeoJSONData> GeoJSONData::create(const GeoJSON& geoJSON,
                                                  std::shared_ptr<Scheduler> sequencedScheduler,
                                                  const Immutable<GeoJSONOptions>& options) {
+    auto data = createData(geoJSON, std::move(sequencedScheduler), options);
+    data->empty = geoJSON.is<Features>() && geoJSON.get<Features>().empty();
+    return data;
+}
+
+std::shared_ptr<GeoJSONData> GeoJSONData::createData(const GeoJSON& geoJSON,
+                                                     std::shared_ptr<Scheduler> sequencedScheduler,
+                                                     const Immutable<GeoJSONOptions>& options) {
     constexpr double scale = util::EXTENT / util::tileSize_D;
     if (options->cluster && geoJSON.is<Features>() && !geoJSON.get<Features>().empty()) {
         mapbox::supercluster::Options clusterOptions;
